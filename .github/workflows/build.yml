@@ -1,0 +1,34 @@
+name: Build APK
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Найти проект (сам распакует zip, если он загружен)
+        run: |
+          if [ ! -f settings.gradle.kts ]; then
+            Z=$(find . -maxdepth 2 -name '*.zip' | head -1)
+            [ -z "$Z" ] && { echo "ZIP с проектом не найден"; exit 1; }
+            mkdir -p _proj && unzip -q "$Z" -d _proj
+            DIR=$(dirname "$(find _proj -name settings.gradle.kts | head -1)")
+          else
+            DIR=.
+          fi
+          echo "DIR=$DIR" >> $GITHUB_ENV
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: "8.9" }
+      - name: Сборка APK
+        run: cd "$DIR" && gradle assembleDebug --no-daemon
+      - name: Выложить APK в Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp "$DIR"/app/build/outputs/apk/debug/app-debug.apk AlteCoffee.apk
+          gh release create "v${{ github.run_number }}" AlteCoffee.apk --title "AlteCoffee APK #${{ github.run_number }}" --notes "Готовый APK. Скачайте AlteCoffee.apk и установите."
