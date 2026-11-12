@@ -23,9 +23,16 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
       - uses: gradle/actions/setup-gradle@v4
-        with: { gradle-version: "8.9" }
+        with: { gradle-version: "8.9", cache-disabled: true }
       - name: Сборка APK
-        run: cd "$DIR" && gradle assembleDebug --no-daemon
+        run: |
+          cd "$DIR"
+          ok=0
+          for n in 1 2 3; do
+            if gradle assembleDebug --no-daemon --refresh-dependencies; then ok=1; break; fi
+            echo "Попытка $n не удалась, повтор через 40 сек"; sleep 40
+          done
+          [ "$ok" = 1 ]
       - name: Выложить APK в Releases
         env:
           GH_TOKEN: ${{ github.token }}
